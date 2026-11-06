@@ -1,1 +1,1 @@
-qualidade.html
+qualidade
