@@ -1,1 +1,132 @@
-teste
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Qualidade LATAM</title>
+
+<style>
+:root{--red:#e31837;--dark:#222;--gray:#f4f5f7;--border:#d9dde3;--green:#20b65a;--yellow:#ffdf35}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f5f6f8;color:#222}
+header{background:#e31837;color:white;padding:22px 28px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{font-size:24px;margin:0}header p{margin:6px 0 0;opacity:.9}
+main{max-width:1400px;margin:22px auto;padding:0 18px}
+.panel{background:white;border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:20px;box-shadow:0 2px 7px #00000008}
+.panel h2{font-size:19px;margin:0 0 14px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+button,select,input{font:inherit;border:1px solid #cbd0d7;border-radius:6px;padding:8px 10px;background:white}
+button{cursor:pointer;font-weight:600}button.primary{background:var(--red);color:white;border-color:var(--red)}button:hover{filter:brightness(.96)}
+input{min-width:70px;width:100%}.name-input{min-width:190px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid var(--border);padding:7px;text-align:center}th{background:#eceff3;font-weight:700}td:first-child,th:first-child{text-align:left}
+.table-wrap{overflow-x:auto}.delete{color:#b00020;background:#fff;border-color:#e4aab2;padding:5px 8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.chartbox{min-height:340px;position:relative;width:100%}.simple-chart{display:flex;align-items:flex-end;gap:14px;overflow-x:auto;min-height:280px;padding:12px 8px;border-bottom:1px solid #ddd}.chart-col{min-width:90px;flex:1;text-align:center}.bars{height:220px;display:flex;align-items:flex-end;justify-content:center;gap:5px}.bar-wrap{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:24px}.bar{width:28px;border-radius:4px 4px 0 0}.bar-value{font-size:11px;margin-bottom:3px}.chart-label{font-size:11px;word-break:break-word;margin-top:8px}.chart-legend{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin:12px}.chart-legend i{display:inline-block;width:12px;height:12px;margin-right:5px;border-radius:2px}
+.note{color:#626a73;font-size:13px;margin-top:8px}
+@media(max-width:850px){.grid{grid-template-columns:1fr}.chartbox{height:300px}}
+</style>
+</head>
+<body>
+<header>
+ <div><h1>📊 Painel de Qualidade LATAM</h1><p>Monitoramento de agentes e supervisores</p></div>
+ <div><label for="month">Mês de referência:</label> <input id="month" type="month" value="2026-11" style="width:160px"></div>
+</header>
+<main>
+<section class="panel">
+ <h2>Agentes — NPS, FCR e TMO</h2>
+ <div class="toolbar">
+  <button class="primary" onclick="addAgent()">＋ Adicionar agente</button>
+  <label>Indicador:</label>
+  <select id="agentMetric" onchange="drawAgentChart()">
+   <option value="nps">NPS</option><option value="fcr">FCR (%)</option><option value="tmo">TMO (segundos)</option>
+  </select>
+  <button onclick="exportCSV('agents')">Exportar agentes CSV</button>
+ </div>
+ <div class="table-wrap"><table id="agentTable"></table></div>
+ <p class="note">Edite os campos diretamente na tabela. Compare a 1ª e a 2ª semana por agente. Use FCR em percentual (ex.: 77) e TMO em segundos (ex.: 739). Os dados ficam salvos neste navegador quando o armazenamento local é permitido.</p>
+ <div class="chartbox"><div id="agentChart"></div></div>
+</section>
+
+<section class="panel">
+ <h2>Supervisores — NPS semanal e mensal</h2>
+ <div class="toolbar">
+  <button class="primary" onclick="addSupervisor()">＋ Adicionar supervisor</button>
+  <label>Indicador:</label>
+  <select id="superMetric" onchange="drawSupervisorChart()">
+   <option value="weeks">NPS semanal (1ª a 4ª semana)</option><option value="month">NPS mensal</option>
+  </select>
+  <button onclick="exportCSV('supervisors')">Exportar supervisores CSV</button>
+ </div>
+ <div class="table-wrap"><table id="superTable"></table></div>
+ <p class="note">Altere nomes, BP, SAG, local e NPS de cada semana. O NPS mensal pode ser informado ou calculado conforme sua regra de negócio.</p>
+ <div class="chartbox"><div id="superChart"></div></div>
+</section>
+<div class="toolbar"><button onclick="resetData()">Restaurar dados de exemplo</button><button onclick="clearData()">Limpar dados</button></div>
+</main>
+<script>
+const defaultAgents=[
+ {name:"Agente 1",nps1:65,nps2:70,fcr1:77,fcr2:80,tmo1:739,tmo2:710},
+ {name:"Agente 2",nps1:33,nps2:45,fcr1:72,fcr2:75,tmo1:810,tmo2:790},
+ {name:"Agente 3",nps1:10,nps2:18,fcr1:68,fcr2:70,tmo1:925,tmo2:890},
+ {name:"Agente 4",nps1:-6,nps2:5,fcr1:61,fcr2:65,tmo1:1020,tmo2:980}
+];
+const defaultSup=[
+ {bp:"4878456",name:"RENATA DA CRUZ ALMEIDA DAMASCENO",sag:"PV2",local:"SSA",w1:22,w2:33,w3:15,w4:-100,month:17},
+ {bp:"4688605",name:"CAROLINA FERNANDA DE OLIVEIRA SOARES",sag:"PV2",local:"HOME SAO",w1:38,w2:27,w3:85,w4:100,month:53},
+ {bp:"4510716",name:"PALLOMA FREIRE RODRIGUES DE OLIVEIRA",sag:"PV2",local:"SAO",w1:65,w2:17,w3:46,w4:0,month:35},
+ {bp:"4878453",name:"REBECA SANTANA FERREIRA",sag:"PV2",local:"BA",w1:6,w2:-12,w3:33,w4:100,month:29},
+ {bp:"4878457",name:"JONATHAN VICTOR DE SANTANA DA SILVA",sag:"PV2",local:"SSA",w1:45,w2:33,w3:94,w4:30,month:58},
+ {bp:"4870037",name:"ANDERSON SILVA SANTOS",sag:"DDT",local:"BA",w1:67,w2:83,w3:8,w4:56,month:54},
+ {bp:"4794854",name:"FRANCISCO LEON QUEIROZ MENDES",sag:"PV2",local:"SSA",w1:60,w2:0,w3:18,w4:100,month:35},
+ {bp:"4888879",name:"ELEN EVELYN CERQUEIRA CORREA",sag:"",local:"",w1:0,w2:0,w3:45,w4:71,month:58}
+];
+let agents, supervisors, agentChart, supervisorChart;
+function cloneData(x){return JSON.parse(JSON.stringify(x))}
+function load(){try{agents=JSON.parse(localStorage.getItem('qa_agents'))||cloneData(defaultAgents);supervisors=JSON.parse(localStorage.getItem('qa_sup'))||cloneData(defaultSup)}catch(e){agents=cloneData(defaultAgents);supervisors=cloneData(defaultSup)}
+ // Compatibilidade com dados salvos na versão anterior
+ agents=agents.map(a=>({name:a.name||'Agente',nps1:a.nps1??a.nps??0,nps2:a.nps2??0,fcr1:a.fcr1??a.fcr??0,fcr2:a.fcr2??0,tmo1:a.tmo1??a.tmo??0,tmo2:a.tmo2??0}));
+}
+function save(){try{localStorage.setItem('qa_agents',JSON.stringify(agents));localStorage.setItem('qa_sup',JSON.stringify(supervisors))}catch(e){/* navegador pode bloquear armazenamento local */}}
+function esc(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;')}
+function cellInput(value,field,i,kind='agent',cls=''){return `<input class="${cls}" value="${esc(value)}" data-kind="${kind}" data-i="${i}" data-field="${field}" onchange="editCell(this)" ${['nps','fcr','tmo','w1','w2','w3','w4','month'].includes(field)?'type="number"':''}>`}
+function renderAgents(){
+ let t=document.getElementById('agentTable');
+ t.innerHTML='<thead><tr><th rowspan="2">Agente</th><th colspan="3">1ª semana</th><th colspan="3">2ª semana</th><th rowspan="2">Ação</th></tr><tr><th>NPS</th><th>FCR (%)</th><th>TMO (s)</th><th>NPS</th><th>FCR (%)</th><th>TMO (s)</th></tr></thead><tbody>'+
+ agents.map((a,i)=>`<tr><td>${cellInput(a.name,'name',i,'agent','name-input')}</td><td>${cellInput(a.nps1,'nps1',i)}</td><td>${cellInput(a.fcr1,'fcr1',i)}</td><td>${cellInput(a.tmo1,'tmo1',i)}</td><td>${cellInput(a.nps2,'nps2',i)}</td><td>${cellInput(a.fcr2,'fcr2',i)}</td><td>${cellInput(a.tmo2,'tmo2',i)}</td><td><button class="delete" onclick="removeAgent(${i})">Excluir</button></td></tr>`).join('')+'</tbody>';
+}
+function renderSup(){
+ let t=document.getElementById('superTable');t.innerHTML='<thead><tr><th>BP-SUPER</th><th>Nome supervisor</th><th>SAG</th><th>Local</th><th>1ª semana</th><th>2ª semana</th><th>3ª semana</th><th>4ª semana</th><th>NPS mensal</th><th>Ação</th></tr></thead><tbody>'+
+ supervisors.map((s,i)=>`<tr>${['bp','name','sag','local','w1','w2','w3','w4','month'].map(f=>`<td>${cellInput(s[f],f,i,'supervisor',f==='name'?'name-input':'')}</td>`).join('')}<td><button class="delete" onclick="removeSupervisor(${i})">Excluir</button></td></tr>`).join('')+'</tbody>';
+}
+function editCell(el){let i=+el.dataset.i,field=el.dataset.field;let target=el.dataset.kind==='agent'?agents:supervisors;target[i][field]=el.type==='number'?(el.value===''?0:Number(el.value)):el.value;save();drawAgentChart();drawSupervisorChart();}
+function addAgent(){agents.push({name:'Novo agente',nps1:0,nps2:0,fcr1:0,fcr2:0,tmo1:0,tmo2:0});save();renderAgents();drawAgentChart()}
+function removeAgent(i){agents.splice(i,1);save();renderAgents();drawAgentChart()}
+function addSupervisor(){supervisors.push({bp:'',name:'Novo supervisor',sag:'',local:'',w1:0,w2:0,w3:0,w4:0,month:0});save();renderSup();drawSupervisorChart()}
+function removeSupervisor(i){supervisors.splice(i,1);save();renderSup();drawSupervisorChart()}
+function renderBars(containerId, labels, series, isNps=false){
+ const el=document.getElementById(containerId);
+ if(!labels.length){el.parentElement.innerHTML='<p class="note">Adicione dados para visualizar o gráfico.</p>';return}
+ const all=series.flatMap(s=>s.values).map(v=>Number(v)||0);
+ let min=isNps?Math.min(0,...all):0, max=Math.max(1,...all);
+ if(isNps && min===max){min=-1;max=1}
+ const range=max-min||1;
+ el.innerHTML=`<div class="simple-chart">${labels.map((name,i)=>`<div class="chart-col"><div class="bars">${series.map((s,j)=>{let v=Number(s.values[i])||0;let height=Math.max(3,Math.abs(v-min)/range*190);return `<div class="bar-wrap" title="${s.label}: ${v}"><span class="bar-value">${v}</span><div class="bar" style="height:${height}px;background:${j===0?'#e31837':'#555'}"></div></div>`}).join('')}</div><div class="chart-label">${esc(name)}</div></div>`).join('')}</div><div class="chart-legend">${series.map((s,i)=>`<span><i style="background:${i===0?'#e31837':'#555'}"></i>${s.label}</span>`).join('')}</div>`;
+}
+function drawAgentChart(){
+ let metric=document.getElementById('agentMetric').value;
+ let label={nps:'NPS',fcr:'FCR (%)',tmo:'TMO (segundos)'}[metric];
+ renderBars('agentChart',agents.map(a=>a.name),[
+  {label:'1ª semana — '+label,values:agents.map(a=>a[metric+'1'])},
+  {label:'2ª semana — '+label,values:agents.map(a=>a[metric+'2'])}
+ ],metric==='nps');
+}
+function drawSupervisorChart(){
+ let mode=document.getElementById('superMetric').value;
+ let series=mode==='weeks'?['w1','w2','w3','w4'].map((f,i)=>({label:`${i+1}ª semana`,values:supervisors.map(s=>s[f])})):[{label:'NPS mensal',values:supervisors.map(s=>s.month)}];
+ renderBars('superChart',supervisors.map(s=>s.name),series,true);
+}
+function exportCSV(type){let rows=type==='agents'?agents:supervisors;let keys=type==='agents'?['name','nps1','fcr1','tmo1','nps2','fcr2','tmo2']:['bp','name','sag','local','w1','w2','w3','w4','month'];let csv=[keys.join(';'),...rows.map(r=>keys.map(k=>`"${String(r[k]??'').replaceAll('"','""')}"`).join(';'))].join('\n');let blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=type+'_qualidade.csv';a.click();URL.revokeObjectURL(a.href)}
+function resetData(){if(confirm('Restaurar os dados de exemplo?')){agents=structuredClone(defaultAgents);supervisors=structuredClone(defaultSup);save();renderAgents();renderSup();drawAgentChart();drawSupervisorChart()}}
+function clearData(){if(confirm('Apagar todos os agentes e supervisores?')){agents=[];supervisors=[];save();renderAgents();renderSup();drawAgentChart();drawSupervisorChart()}}
+document.getElementById('month').addEventListener('change',()=>{document.title='Painel de Qualidade — '+document.getElementById('month').value});
+load();renderAgents();renderSup();drawAgentChart();drawSupervisorChart();
+</script>
+</body></html>
